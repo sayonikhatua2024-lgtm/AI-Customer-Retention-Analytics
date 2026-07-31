@@ -99,9 +99,14 @@ AI-Customer-Retention-Analytics/
 │   └── customer_churn_model.pkl  # Trained sklearn Pipeline
 ├── notebooks/
 │   └── 01_Data_Understanding.ipynb  # EDA, model comparison, SHAP, notebook-native workflow
+├── docs/
+│   ├── architecture.md              # System architecture and production notes
+│   ├── data_card.md                 # Dataset assumptions, target, and limitations
+│   └── model_card.md                # Model metrics, intended use, and governance
 ├── screenshots/                  # Dashboard screenshots (see screenshots/README.md)
 ├── tests/                        # pytest unit tests for the ML modules
 ├── requirements.txt
+├── requirements.lock             # Exact dependency versions from the validated environment
 └── .gitignore
 ```
 
@@ -243,10 +248,16 @@ run the dashboard locally and add real ones.
   remain available for dashboard segmentation, and as a candidate
   feature set for a future retraining pass (see below).
 - **Synthetic Customer ID:** the original `CustomerID` field is
-  dropped upstream as a non-predictive identifier (consistent with
-  the notebook's EDA). The dashboard's `Customer ID` column is a
-  display-only identifier generated at dashboard-build time, not the
-  original account ID.
+  excluded from model features as a non-predictive identifier
+  (consistent with the notebook's EDA). When row alignment with the raw
+  dataset can be verified, the dashboard preserves it for display/export
+  only; otherwise, the dashboard falls back to a synthetic display
+  identifier.
+- **Model governance:** the shipped model is accompanied by
+  `models/model_metadata.json`, which records model version, training
+  timestamp, metrics, feature schema, runtime versions, and training
+  configuration. `src.model.load_model()` validates this metadata before
+  serving predictions.
 
 ## Future Improvements
 

@@ -31,7 +31,6 @@ if str(BASE_DIR) not in sys.path:
 import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 from src import config
@@ -113,7 +112,11 @@ def get_dashboard_df(_model) -> pd.DataFrame:
     df = load_dashboard_data(model=_model)
     df = add_business_features(df)
     df = df.reset_index(drop=True)
-    df.insert(0, "Customer ID", [f"CUST-{i:06d}" for i in range(1, len(df) + 1)])
+    if "Customer ID" not in df.columns:
+        if "CustomerID" in df.columns:
+            df.insert(0, "Customer ID", df["CustomerID"])
+        else:
+            df.insert(0, "Customer ID", [f"CUST-{i:06d}" for i in range(1, len(df) + 1)])
     return df
 
 
@@ -212,6 +215,7 @@ filtered_df = df[
     & df["Tenure Months"].between(*tenure_range)
     & df["Monthly Charges"].between(*charge_range)
 ]
+has_filtered_rows = not filtered_df.empty
 
 # ---------------------------------------------------------------------------
 # Header + KPI cards
@@ -272,6 +276,10 @@ tab_overview, tab_customers, tab_explain, tab_insights, tab_data = st.tabs(
 )
 
 PLOTLY_TEMPLATE = "plotly_dark"
+
+if not has_filtered_rows:
+    st.warning("No customers match the current filters. Adjust the sidebar filters to view dashboard content.")
+    st.stop()
 
 # ---- Overview tab ----------------------------------------------------------
 with tab_overview:

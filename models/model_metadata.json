@@ -1,0 +1,80 @@
+{
+  "model_version": "1.0.0",
+  "training_timestamp": "2026-07-31T00:00:00Z",
+  "artifact_path": "models/customer_churn_model.pkl",
+  "model_type": "sklearn.pipeline.Pipeline",
+  "estimator": "RandomForestClassifier",
+  "metrics": {
+    "test_size": 1409,
+    "accuracy": 0.805,
+    "roc_auc": 0.851,
+    "pr_auc": 0.670,
+    "precision_churn": 0.659,
+    "recall_churn": 0.548,
+    "f1_churn": 0.599,
+    "confusion_matrix": {
+      "true_negative": 929,
+      "false_positive": 106,
+      "false_negative": 169,
+      "true_positive": 205
+    }
+  },
+  "feature_schema": {
+    "numeric_features": [
+      "Tenure Months",
+      "Monthly Charges",
+      "Total Charges"
+    ],
+    "categorical_features": [
+      "Gender",
+      "Senior Citizen",
+      "Partner",
+      "Dependents",
+      "Phone Service",
+      "Multiple Lines",
+      "Internet Service",
+      "Online Security",
+      "Online Backup",
+      "Device Protection",
+      "Tech Support",
+      "Streaming TV",
+      "Streaming Movies",
+      "Contract",
+      "Paperless Billing",
+      "Payment Method"
+    ],
+    "target_column": "Churn Label",
+    "target_map": {
+      "No": 0,
+      "Yes": 1
+    },
+    "transformed_feature_count": 46
+  },
+  "runtime": {
+    "python_version": "3.12.13",
+    "scikit_learn_version": "1.9.0"
+  },
+  "training_configuration": {
+    "random_state": 42,
+    "test_size": 0.2,
+    "grid_search_cv_folds": 5,
+    "grid_search_scoring": "f1",
+    "best_params": {
+      "classifier__n_estimators": 200,
+      "classifier__max_depth": 10,
+      "classifier__min_samples_split": 5
+    },
+    "param_grid": {
+      "classifier__n_estimators": [100, 200, 300],
+      "classifier__max_depth": [5, 10, 20, null],
+      "classifier__min_samples_split": [2, 5, 10]
+    }
+  },
+  "data": {
+    "source": "IBM Telco Customer Churn dataset",
+    "raw_path": "data/raw/Telco_customer_churn.xlsx",
+    "raw_rows": 7043,
+    "raw_columns": 33,
+    "processed_dashboard_rows": 7043
+  }
+}
