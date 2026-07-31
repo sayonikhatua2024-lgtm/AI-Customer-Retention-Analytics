@@ -474,6 +474,7 @@ with tab_explain:
     if st.button("Generate SHAP Explanation", type="primary"):
         try:
             from src.explainability import explain_customer
+            import plotly.graph_objects as go
 
             row = filtered_df[filtered_df["Customer ID"] == explain_id]
             X_row = row[config.MODEL_FEATURES]
@@ -481,15 +482,90 @@ with tab_explain:
             with st.spinner("Computing SHAP values..."):
                 explanation = explain_customer(model, X_row)
 
-            import shap
+            # Generate Native Plotly Waterfall Chart instead of Matplotlib
+            import numpy as np
 
-            fig, ax = plt.subplots(figsize=(9, 6))
-            plt.sca(ax)
-            shap.plots.waterfall(explanation, max_display=15, show=False)
-            fig.patch.set_facecolor("#0E1117")
-            ax.set_facecolor("#0E1117")
-            st.pyplot(fig, use_container_width=True)
-            plt.close(fig)
+            shap_values = explanation.values
+            base_value = explanation.base_values
+            feature_names = explanation.feature_names
+            data = explanation.data
+
+            max_display = 15
+            if len(shap_values) > max_display:
+                abs_vals = np.abs(shap_values)
+                # Get indices of top features
+                top_indices = np.argsort(abs_vals)[-max_display:]
+
+                # Sum the rest
+                other_indices = np.argsort(abs_vals)[:-max_display]
+                other_sum = np.sum(shap_values[other_indices])
+
+                # Order top features descending
+                top_indices = top_indices[::-1]
+
+                # Combine: Others at the start, then top features in reverse order
+                # Plotly waterfall builds from left to right.
+                plot_features = ["Other features"] + [feature_names[i] for i in top_indices[::-1]]
+                plot_values = [other_sum] + [shap_values[i] for i in top_indices[::-1]]
+                plot_data = [""] + [
+                    str(round(data[i], 3)) if isinstance(data[i], (float, np.floating)) else str(data[i])
+                    for i in top_indices[::-1]
+                ]
+            else:
+                abs_vals = np.abs(shap_values)
+                top_indices = np.argsort(abs_vals)[::-1]
+
+                plot_features = [feature_names[i] for i in top_indices[::-1]]
+                plot_values = [shap_values[i] for i in top_indices[::-1]]
+                plot_data = [
+                    str(round(data[i], 3)) if isinstance(data[i], (float, np.floating)) else str(data[i])
+                    for i in top_indices[::-1]
+                ]
+
+            measure = ["absolute"] + ["relative"] * len(plot_values) + ["total"]
+            x_labels = ["Base"] + plot_features + ["Prediction"]
+
+            # Calculate intermediate sums for hover
+            cumulative = base_value
+            y_values = [base_value]
+            for v in plot_values:
+                y_values.append(v)
+            y_values.append(base_value + sum(plot_values))
+
+            # Hover text
+            hover_text = [f"Base probability: {base_value:.3f}"]
+            for f, d, v in zip(plot_features, plot_data, plot_values):
+                display_val = f" = {d}" if d else ""
+                hover_text.append(f"<b>{f}</b>{display_val}<br>Impact: {v:+.3f}")
+            hover_text.append(f"Final predicted probability: {y_values[-1]:.3f}")
+
+            fig = go.Figure(go.Waterfall(
+                name="SHAP",
+                orientation="v",
+                measure=measure,
+                x=x_labels,
+                textposition="outside",
+                text=[f"{v:+.3f}" if m == "relative" else f"{v:.3f}" for v, m in zip(y_values, measure)],
+                y=y_values,
+                hoverinfo="text",
+                hovertext=hover_text,
+                connector={"line": {"color": "rgba(255, 255, 255, 0.2)"}},
+                decreasing={"marker": {"color": "#4C6FFF"}},
+                increasing={"marker": {"color": "#E74C3C"}},
+                totals={"marker": {"color": "#F5F6FA"}}
+            ))
+
+            fig.update_layout(
+                showlegend=False,
+                template=PLOTLY_TEMPLATE,
+                margin=dict(t=20, b=120, l=10, r=10),
+                height=500,
+                xaxis_title="",
+                yaxis_title="Churn Probability",
+            )
+            fig.update_xaxes(tickangle=-45)
+
+            st.plotly_chart(fig, use_container_width=True)
         except ImportError:
             st.error("SHAP is not installed. Run: pip install shap")
         except Exception as e:  # noqa: BLE001
@@ -497,43 +573,70 @@ with tab_explain:
 
 # ---- Business Insights tab -------------------------------------------------
 with tab_insights:
-    st.markdown('<div class="section-title">Key Observations</div>', unsafe_allow_html=True)
-    st.caption("Derived from the exploratory data analysis in `notebooks/01_Data_Understanding.ipynb`.")
+    st.markdown('<div class="section-title">Dynamic Business Insights</div>', unsafe_allow_html=True)
+    st.caption("Calculated in real-time based on your current filters.")
 
-    insights = [
-        (
-            "Fiber Optic customers churn the most",
-            "Customers on Fiber Optic internet show a markedly higher churn rate than DSL "
-            "users, while customers with no internet service churn the least. "
-            "**Action:** review Fiber Optic pricing, reliability, and support quality.",
-        ),
-        (
-            "Electronic Check payers are highest-risk",
-            "Customers paying via Electronic Check churn far more than those on automatic "
-            "payment methods. **Action:** incentivize migration to autopay with a small "
-            "discount or cashback.",
-        ),
-        (
-            "Month-to-month contracts drive churn",
-            "Short-term, flexible contracts correlate strongly with churn versus one- and "
-            "two-year contracts. **Action:** promote annual plans with a loyalty discount.",
-        ),
-        (
-            "Tenure and lifetime value are closely linked",
-            "Tenure shows the strongest positive relationship with customer lifetime value. "
-            "**Action:** early-tenure retention has outsized long-term revenue impact.",
-        ),
-        (
-            "Customers with dependents churn less",
-            "Family-oriented customers (with partners and/or dependents) show lower churn. "
-            "**Action:** bundle family plans to increase stickiness.",
-        ),
-    ]
+    insights = []
+
+    # Dynamic Insight 1: Internet Service
+    if "Internet Service" in filtered_df.columns and len(filtered_df["Internet Service"].unique()) > 1:
+        internet_churn = filtered_df.groupby("Internet Service")["Churn Probability"].mean().sort_values(ascending=False)
+        highest_internet = internet_churn.index[0]
+        highest_internet_val = internet_churn.iloc[0] * 100
+        insights.append((
+            f"{highest_internet} customers show the highest risk",
+            f"Within the current segment, customers on **{highest_internet}** internet show an average predicted churn risk of **{highest_internet_val:.1f}%**. "
+            f"**Action:** Consider targeted reliability improvements or pricing reviews for {highest_internet} plans."
+        ))
+
+    # Dynamic Insight 2: Payment Method
+    if "Payment Method" in filtered_df.columns and len(filtered_df["Payment Method"].unique()) > 1:
+        payment_churn = filtered_df.groupby("Payment Method")["Churn Probability"].mean().sort_values(ascending=False)
+        highest_payment = payment_churn.index[0]
+        highest_payment_val = payment_churn.iloc[0] * 100
+        insights.append((
+            f"{highest_payment} is the highest-risk payment method",
+            f"Customers paying via **{highest_payment}** average a **{highest_payment_val:.1f}%** churn risk. "
+            f"**Action:** Incentivize migration to automatic payment methods with a small discount or cashback."
+        ))
+
+    # Dynamic Insight 3: Contract Type
+    if "Contract" in filtered_df.columns and len(filtered_df["Contract"].unique()) > 1:
+        contract_churn = filtered_df.groupby("Contract")["Churn Probability"].mean().sort_values(ascending=False)
+        highest_contract = contract_churn.index[0]
+        highest_contract_val = contract_churn.iloc[0] * 100
+        lowest_contract = contract_churn.index[-1]
+        lowest_contract_val = contract_churn.iloc[-1] * 100
+        insights.append((
+            f"{highest_contract} contracts drive churn",
+            f"**{highest_contract}** contracts show a **{highest_contract_val:.1f}%** churn risk, compared to just **{lowest_contract_val:.1f}%** for {lowest_contract} contracts. "
+            f"**Action:** Promote annual or multi-year plans with loyalty discounts to increase stickiness."
+        ))
+
+    # Dynamic Insight 4: High vs Low Bills
+    if "Monthly Charges" in filtered_df.columns:
+        median_bill = filtered_df["Monthly Charges"].median()
+        high_bill_risk = filtered_df[filtered_df["Monthly Charges"] > median_bill]["Churn Probability"].mean() * 100
+        low_bill_risk = filtered_df[filtered_df["Monthly Charges"] <= median_bill]["Churn Probability"].mean() * 100
+        if high_bill_risk > low_bill_risk:
+            insights.append((
+                "Higher bills correlate with higher risk",
+                f"Customers paying above the median bill (${median_bill:.2f}) have an average churn risk of **{high_bill_risk:.1f}%**, compared to **{low_bill_risk:.1f}%** for those below the median. "
+                f"**Action:** Monitor high-value accounts proactively and ensure they are deriving clear value from premium services."
+            ))
+
+    if not insights:
+        insights.append((
+            "Not enough variance",
+            "The current filters are too narrow to extract comparative business insights. Broaden your filters to see cohort comparisons."
+        ))
+
     for title, body in insights:
         with st.container(border=True):
             st.markdown(f"**{title}**")
             st.markdown(body)
 
+    st.write("")
     st.markdown('<div class="section-title">Recommendation Mix</div>', unsafe_allow_html=True)
     rec_counts = filtered_df["Recommendation"].value_counts().reset_index()
     rec_counts.columns = ["Recommendation", "Count"]
