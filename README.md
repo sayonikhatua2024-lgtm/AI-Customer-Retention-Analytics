@@ -1,84 +1,87 @@
-# AI Customer Retention Analytics Platform
+<div align="center">
 
-An end-to-end machine learning system that predicts customer churn,
-segments customers by risk, explains *why* the model thinks a
-customer will churn, and recommends a retention action — wrapped in
-an interactive Streamlit dashboard.
+# 📊 AI Customer Retention Analytics Platform
 
-Built on the IBM Telco Customer Churn dataset (7,043 customers).
+**Predictive churn intelligence, risk segmentation, and explainable retention recommendations.**
+
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B.svg)](https://streamlit.io/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4+-F7931E.svg)](https://scikit-learn.org/)
+[![SHAP](https://img.shields.io/badge/SHAP-Explainable%20AI-9cf.svg)](https://shap.readthedocs.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+</div>
 
 ---
 
-## Overview
+## 📖 Project Overview
 
-Telecom companies lose a meaningful share of revenue every year to
-avoidable customer churn. This project builds a full retention
-pipeline on top of that problem:
+Telecom companies lose a meaningful share of revenue every year to avoidable customer churn. This project is an end-to-end machine learning system that not only predicts customer churn but translates those predictions into actionable business insights.
 
-**Raw data → cleaning → model → risk scoring → explainability → retention recommendation → dashboard**
+The platform provides a complete retention pipeline:
+**Raw data → Data Cleaning → ML Modeling → Risk Scoring → Explainability (SHAP) → Retention Recommendation → Interactive Dashboard**
 
-It's designed to be read end-to-end by a technical reviewer in a few
-minutes: a Jupyter notebook for the exploratory / model-selection
-work, and a clean `src/` package that turns that notebook into
-production code the dashboard actually runs on (no logic is
-duplicated between the two).
+Built on the IBM Telco Customer Churn dataset (7,043 customers), this project demonstrates production-grade ML engineering, clear separation of concerns, and executive-level business storytelling.
 
-## Business Problem
+---
 
-Given a customer's account and service attributes, predict the
-probability they will churn, and translate that into three things a
-retention team can act on immediately:
+## 🎯 Business Problem & Solution
 
-1. **Risk tier** (Low / Medium / High / Critical)
-2. **Why** — the specific features driving that customer's score (SHAP)
-3. **What to do about it** — a concrete, auditable recommended action
+**The Problem:** Customer support and retention teams often operate reactively. When they do use predictive scores, the models are usually "black boxes," leaving agents without a concrete reason *why* a customer is at risk or *what* to do about it.
 
-## Features
+**The Solution:** This platform bridges the gap between predictive modeling and business action:
+1.  **Risk Tiering:** Segments customers into Low, Medium, High, and Critical risk tiers.
+2.  **Explainability (SHAP):** Uncovers the specific features driving an individual customer's churn score.
+3.  **Auditable Actions:** Provides concrete, rule-based retention recommendations (e.g., "Priority retention call + Loyalty reward") keyed on risk tier, contract type, and monthly spend.
 
-- **Churn prediction** for the full customer base via a tuned Random Forest
-- **Risk segmentation** into four tiers with configurable thresholds
-- **Rule-based retention recommendations**, keyed on risk tier, contract type, and monthly spend
-- **SHAP explainability** — global feature importance and per-customer waterfall plots
-- **Interactive Streamlit dashboard** — KPI cards, Plotly charts, customer lookup, high-risk customer export
-- **Self-healing data layer** — if the processed dashboard dataset is missing, the app regenerates it from the raw data and trained model automatically
-- **Retrainable pipeline** — `src/train.py` reproduces the exact model-selection process from the notebook end-to-end
+---
 
-## Architecture
+## ✨ Feature Highlights
 
-```
-Raw Excel (Telco_customer_churn.xlsx)
-        │
-        ▼
- data_pipeline.py   — load, clean, coerce types
-        │
-        ▼
-   train.py          — preprocessing + GridSearchCV Random Forest ──► models/customer_churn_model.pkl
-        │
-        ▼
- data_pipeline.py    — score full customer base
-        │
-        ▼
- risk_engine.py       — probability → risk tier
-        │
-        ▼
- recommendation_engine.py — risk tier → retention action
-        │
-        ▼
- data/processed/dashboard_data.csv
-        │
-        ▼
- dashboard/app.py  ◄── explainability.py (SHAP)
-                    ◄── feature_engineering.py (segmentation features)
-                    ◄── model.py (feature importances)
+- **Predictive Engine:** Churn prediction via a tuned scikit-learn Random Forest model.
+- **Explainable AI (XAI):** Global feature importance and per-customer SHAP waterfall plots for deep model transparency.
+- **Executive Dashboard:** An interactive, dark-themed Streamlit application featuring KPI cards, dynamic business insights, and Plotly visualizations.
+- **Rule-Based Recommendations:** A transparent, business-friendly recommendation engine that translates risk into action.
+- **Self-Healing Data Layer:** If the processed dataset is missing, the app automatically regenerates it from the raw data and trained model.
+- **Robust Model Governance:** Built-in validation of model metadata (schema, versions, training config) before serving predictions.
+
+---
+
+## 🛠️ Technology Stack
+
+- **Machine Learning:** `scikit-learn` (Pipeline, ColumnTransformer, RandomForestClassifier, GridSearchCV)
+- **Explainability:** `SHAP` (TreeExplainer)
+- **Dashboard & UI:** `Streamlit`, `Plotly`, `Matplotlib`
+- **Data Manipulation:** `pandas`, `NumPy`
+- **Testing:** `pytest`
+
+---
+
+## 🏗️ Architecture & Data Flow
+
+```mermaid
+graph TD;
+    A[Raw Excel Data] -->|data_pipeline.py| B(Cleaned Data)
+    B -->|train.py / GridSearchCV| C((Trained Model .pkl))
+    B -->|data_pipeline.py| D(Model Features)
+    C -->|predict_proba| E(Churn Probability)
+    D --> E
+    E -->|risk_engine.py| F(Risk Tier)
+    F -->|recommendation_engine.py| G(Recommended Action)
+    D --> H[Dashboard Dataset]
+    F --> H
+    G --> H
+    H -->|app.py| I[Streamlit Dashboard]
+    C -->|explainability.py| I
 ```
 
-Each pipeline stage is its own module with a single responsibility —
-no logic is duplicated between the notebook, the training script, and
-the dashboard.
+*(Note: The pipeline strictly separates the training logic, the scoring logic, and the presentation layer. No business logic is duplicated in the Streamlit app.)*
 
-## Folder Structure
+---
 
-```
+## 📂 Folder Structure
+
+```text
 AI-Customer-Retention-Analytics/
 ├── dashboard/
 │   └── app.py                    # Streamlit dashboard (presentation layer only)
@@ -96,9 +99,10 @@ AI-Customer-Retention-Analytics/
 │   ├── raw/                      # Telco_customer_churn.xlsx
 │   └── processed/                # dashboard_data.csv (auto-regenerated if missing)
 ├── models/
-│   └── customer_churn_model.pkl  # Trained sklearn Pipeline
+│   ├── customer_churn_model.pkl  # Trained sklearn Pipeline
+│   └── model_metadata.json       # Model governance and schema validation
 ├── notebooks/
-│   └── 01_Data_Understanding.ipynb  # EDA, model comparison, SHAP, notebook-native workflow
+│   └── 01_Data_Understanding.ipynb  # EDA, model comparison, SHAP workflow
 ├── docs/
 │   ├── architecture.md              # System architecture and production notes
 │   ├── data_card.md                 # Dataset assumptions, target, and limitations
@@ -106,70 +110,62 @@ AI-Customer-Retention-Analytics/
 ├── screenshots/                  # Dashboard screenshots (see screenshots/README.md)
 ├── tests/                        # pytest unit tests for the ML modules
 ├── requirements.txt
-├── requirements.lock             # Exact dependency versions from the validated environment
 └── .gitignore
 ```
 
-## Technologies
+---
 
-- **ML:** scikit-learn (Pipeline, ColumnTransformer, RandomForestClassifier, GridSearchCV)
-- **Explainability:** SHAP (TreeExplainer)
-- **Dashboard:** Streamlit, Plotly, Matplotlib
-- **Data:** pandas, NumPy, openpyxl
-- **Testing:** pytest
+## 🚀 Installation & Usage
 
-## Installation
+### 1. Setup the Environment
 
 ```bash
 git clone <your-repo-url>
 cd AI-Customer-Retention-Analytics
 
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+# Create and activate a virtual environment (e.g. venv)
+python3 -m venv venv
+source venv/bin/activate        # On Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
 ```
 
-## Usage
-
-**Run the dashboard:**
+### 2. Run the Dashboard
 
 ```bash
 streamlit run dashboard/app.py
 ```
+> **Self-Healing Note:** On the first run, if `data/processed/dashboard_data.csv` isn't present, the app will automatically score the full customer base using the trained model in `models/customer_churn_model.pkl`.
 
-On first run, if `data/processed/dashboard_data.csv` isn't present,
-the app scores the full customer base from
-`data/raw/Telco_customer_churn.xlsx` using the trained model in
-`models/customer_churn_model.pkl` and generates it automatically. You
-can also force a rescore anytime from the sidebar
-("Regenerate dashboard data").
-
-**Retrain the model from scratch:**
+### 3. Retrain the Model (Optional)
 
 ```bash
-python -m src.train              # full GridSearchCV (slower, matches notebook exactly)
-python -m src.train --fast       # single fit with known-good params (fast iteration)
+python -m src.train              # Full GridSearchCV (matches notebook exactly)
+python -m src.train --fast       # Single fit with known-good params (fast iteration)
 ```
 
-**Run the test suite:**
+### 4. Run Tests
 
 ```bash
 pytest tests/ -v
 ```
 
-**Explore the original analysis:**
+---
 
-```bash
-jupyter notebook notebooks/01_Data_Understanding.ipynb
-```
+## 📊 Dashboard Visuals
 
-## Results
+> **Placeholder:** High-resolution screenshots of the dashboard tabs (Overview, Customers & Risk, Explainability, Business Insights) go here.
+> *To generate screenshots, run the Streamlit app locally and capture the browser window.*
 
-Held-out test set (1,409 customers, 20% split, `random_state=42`),
-evaluated directly against the shipped `customer_churn_model.pkl`
-(Random Forest, GridSearchCV-tuned: `n_estimators=200`,
-`max_depth=10`, `min_samples_split=5`):
+- **Overview Tab:** Executive KPI summary and risk distribution charts.
+- **Customers & Risk Tab:** Filterable data table of high-risk customers with concrete retention recommendations.
+- **Explainability Tab:** Interactive SHAP waterfall plots explaining individual customer risk scores.
+
+---
+
+## 📈 ML Performance & Business Impact
+
+Held-out test set (1,409 customers, 20% split, `random_state=42`) evaluated directly against the shipped `customer_churn_model.pkl`:
 
 | Metric | Value |
 |---|---|
@@ -180,94 +176,27 @@ evaluated directly against the shipped `customer_churn_model.pkl`
 | Recall (churn class) | 0.548 |
 | F1 (churn class) | 0.599 |
 
-```
-Confusion Matrix
-                Predicted: No   Predicted: Yes
-Actual: No           929              106
-Actual: Yes          169              205
-```
-
-**Reading these numbers honestly:** recall on the churn class (0.548)
-means the model misses roughly 45% of customers who actually churn —
-common for imbalanced churn datasets (~27% positive class here) and a
-known trade-off of optimizing for F1 during tuning. The
-`Explainability` tab and `src/risk_engine.py`'s adjustable thresholds
-exist specifically so a retention team can trade precision for recall
-(e.g., lower the "High" threshold to catch more at-risk customers, at
-the cost of more false positives to act on).
-
-## Explainable AI (SHAP)
-
-The dashboard's Explainability tab exposes two views:
-
-- **Global feature importance** — which features matter most to the
-  model overall (Random Forest's native `feature_importances_`)
-- **Per-customer SHAP waterfall** — for any selected customer, exactly
-  which features pushed their churn probability up or down from the
-  model's average prediction, and by how much
-
-This matters for a retention program in practice: a call-center agent
-or account manager needs a *reason*, not just a score, before they can
-have a productive retention conversation.
-
-## Dashboard Screenshots
-
-See [`screenshots/README.md`](screenshots/README.md) for what to
-capture and where it's referenced. Screenshots aren't included yet —
-run the dashboard locally and add real ones.
-
-## Deployment (Streamlit Community Cloud)
-
-1. Push this repository to GitHub (the `.gitignore` already excludes
-   local/venv artifacts — `data/`, `models/`, and `notebooks/` are
-   intentionally **not** ignored, since the dashboard needs them at
-   runtime).
-2. On [share.streamlit.io](https://share.streamlit.io), create a new
-   app pointing at this repo.
-3. Set the main file path to `dashboard/app.py`.
-4. Deploy. No secrets or environment variables are required — all
-   paths are relative (`src/config.py`), so the app runs identically
-   locally and in the cloud.
-
-## Known Limitations & Design Decisions
-
-- **Class imbalance:** ~27% of customers in the training data
-  actually churned. This caps achievable recall without either
-  resampling or adjusting the classification threshold — both are
-  natural next steps (see below).
-- **Rule-based recommendations, not a second model:** the
-  risk → action mapping in `recommendation_engine.py` is an explicit,
-  auditable rule table rather than a learned policy, by design — a
-  retention program needs to be able to explain *why* a given action
-  was suggested to a non-technical stakeholder in one sentence.
-- **Engineered features are dashboard-only:** the notebook explores
-  additional features (`Avg Monthly Spend`, `Long Term Customer`,
-  etc., see `feature_engineering.py`) that were never fed back into
-  model training — inspecting the shipped pickle confirms its
-  `ColumnTransformer` only accepts the original 19 raw features. They
-  remain available for dashboard segmentation, and as a candidate
-  feature set for a future retraining pass (see below).
-- **Synthetic Customer ID:** the original `CustomerID` field is
-  excluded from model features as a non-predictive identifier
-  (consistent with the notebook's EDA). When row alignment with the raw
-  dataset can be verified, the dashboard preserves it for display/export
-  only; otherwise, the dashboard falls back to a synthetic display
-  identifier.
-- **Model governance:** the shipped model is accompanied by
-  `models/model_metadata.json`, which records model version, training
-  timestamp, metrics, feature schema, runtime versions, and training
-  configuration. `src.model.load_model()` validates this metadata before
-  serving predictions.
-
-## Future Improvements
-
-- Retrain including the currently dashboard-only engineered features, and compare against the current 19-feature baseline
-- Address class imbalance directly (class weighting, SMOTE, or threshold tuning tied to a business cost matrix)
-- Add model monitoring / drift detection for production use
-- Persist a model registry (e.g. MLflow) instead of a single `.pkl` file, to track experiments across retrains
-- Add authentication if this were to move from a portfolio piece to an internal tool
-- A/B test the rule-based recommendation engine against actual retention outcomes, and replace rules that don't move the needle
+**Business Interpretation:**
+While recall on the churn class (0.548) indicates the model misses some churners (a known trade-off of standard F1 optimization on an imbalanced dataset), the **Explainability** tab and adjustable risk thresholds in `src/risk_engine.py` allow retention teams to strategically trade precision for recall based on business costs (Customer Acquisition Cost vs. Retention Campaign Cost).
 
 ---
 
-*Built as a portfolio project demonstrating end-to-end ML engineering: data cleaning, model selection, hyperparameter tuning, explainability, business rule design, and production dashboard development.*
+## ☁️ Deployment (Streamlit Community Cloud)
+
+1. Push this repository to GitHub.
+   *(Note: `.gitignore` excludes local/venv artifacts. `data/`, `models/`, and `notebooks/` are intentionally included for the dashboard runtime).*
+2. Navigate to [share.streamlit.io](https://share.streamlit.io) and create a new app pointing at this repository.
+3. Set the main file path to `dashboard/app.py`.
+4. Deploy! No environment variables or secrets are required.
+
+---
+
+## 🗺️ Future Roadmap
+
+- **Cost-Sensitive Learning:** Introduce class weights (`class_weight='balanced'`) or threshold tuning tied directly to a business cost matrix to improve recall for high-value customers.
+- **Batch Pipeline Orchestration:** Transition synchronous dashboard data regeneration to an asynchronous Airflow or Prefect pipeline for handling larger datasets.
+- **Enhanced UI Testing:** Implement Streamlit `AppTest` to automate presentation layer testing alongside the backend ML tests.
+- **Model Registry:** Integrate MLflow for robust experiment tracking and model versioning across retrains.
+
+---
+*Built as a flagship portfolio project demonstrating end-to-end ML engineering, clean architecture, and executive-ready data products.*
