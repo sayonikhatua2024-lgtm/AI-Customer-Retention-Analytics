@@ -33,6 +33,7 @@ MODELS_DIR = BASE_DIR / "models"
 RAW_DATA_PATH = RAW_DATA_DIR / "Telco_customer_churn.xlsx"
 DASHBOARD_DATA_PATH = PROCESSED_DATA_DIR / "dashboard_data.csv"
 MODEL_PATH = MODELS_DIR / "customer_churn_model.pkl"
+MODEL_METADATA_PATH = MODELS_DIR / "model_metadata.json"
 
 # ---------------------------------------------------------------------------
 # Raw dataset columns that carry no predictive signal or that leak the

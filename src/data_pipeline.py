@@ -154,6 +154,8 @@ def generate_dashboard_dataset(model, save: bool = True) -> pd.DataFrame:
     churn_probability = model.predict_proba(X)[:, 1]
 
     dashboard_df = X.copy()
+    if "CustomerID" in raw_df.columns:
+        dashboard_df.insert(0, "CustomerID", raw_df["CustomerID"].values)
     if y is not None:
         dashboard_df["Actual Churn"] = y.values
     dashboard_df["Churn Probability"] = churn_probability
@@ -167,6 +169,47 @@ def generate_dashboard_dataset(model, save: bool = True) -> pd.DataFrame:
         logger.info("Saved dashboard dataset to %s", config.DASHBOARD_DATA_PATH)
 
     return dashboard_df
+
+
+def restore_customer_ids(dashboard_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Restore original ``CustomerID`` values to an existing dashboard dataset
+    only when row alignment can be verified against the raw data.
+
+    Earlier dashboard CSVs were generated without identifiers. Because
+    customer IDs are display/export fields and not model features, this
+    function validates that the model-feature rows still match the raw
+    pipeline output before inserting IDs. If validation cannot be
+    completed, the dataframe is returned unchanged to avoid mislabeling
+    customer records.
+    """
+    if "CustomerID" in dashboard_df.columns:
+        return dashboard_df
+
+    if not set(config.MODEL_FEATURES).issubset(dashboard_df.columns):
+        logger.warning("Cannot restore CustomerID: dashboard data is missing model feature columns.")
+        return dashboard_df
+
+    try:
+        raw_df = load_raw_data()
+        clean_df = clean_data(raw_df)
+        raw_X, _ = prepare_model_data(clean_df)
+    except MissingAssetError:
+        logger.warning("Cannot restore CustomerID: raw data is not available.")
+        return dashboard_df
+
+    dashboard_features = dashboard_df[config.MODEL_FEATURES].reset_index(drop=True)
+    raw_features = raw_X.reset_index(drop=True)
+    if len(dashboard_features) != len(raw_features) or not dashboard_features.equals(raw_features):
+        logger.warning(
+            "Cannot restore CustomerID: dashboard rows do not align exactly with raw model features."
+        )
+        return dashboard_df
+
+    out = dashboard_df.copy()
+    out.insert(0, "CustomerID", raw_df["CustomerID"].reset_index(drop=True))
+    logger.info("Restored CustomerID values to dashboard dataset.")
+    return out
 
 
 def load_dashboard_data(model=None) -> pd.DataFrame:
@@ -183,7 +226,7 @@ def load_dashboard_data(model=None) -> pd.DataFrame:
     """
     if config.DASHBOARD_DATA_PATH.exists():
         logger.info("Loading existing dashboard dataset from %s", config.DASHBOARD_DATA_PATH)
-        return pd.read_csv(config.DASHBOARD_DATA_PATH)
+        return restore_customer_ids(pd.read_csv(config.DASHBOARD_DATA_PATH))
 
     logger.warning(
         "Dashboard dataset not found at %s — attempting to regenerate it.",

@@ -21,12 +21,17 @@ and ``data/processed/dashboard_data.csv`` will be regenerated to match.
 from __future__ import annotations
 
 import argparse
+import json
+import sys
+from datetime import UTC, datetime
+from importlib import metadata
 
 import joblib
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     classification_report,
     confusion_matrix,
     roc_auc_score,
@@ -128,27 +133,95 @@ def train(tune: bool = True, save: bool = True) -> Pipeline:
         )
         model.fit(X_train, y_train)
 
-    evaluate(model, X_test, y_test)
+    metrics = evaluate(model, X_test, y_test)
 
     if save:
         config.MODELS_DIR.mkdir(parents=True, exist_ok=True)
         joblib.dump(model, config.MODEL_PATH)
         logger.info("Saved trained model to %s", config.MODEL_PATH)
+        save_model_metadata(model, metrics, raw_df.shape[0], raw_df.shape[1], len(X_test))
 
         generate_dashboard_dataset(model, save=True)
 
     return model
 
 
-def evaluate(model: Pipeline, X_test, y_test) -> None:
-    """Print accuracy, confusion matrix, classification report, and ROC-AUC."""
+def evaluate(model: Pipeline, X_test, y_test) -> dict:
+    """Log evaluation metrics and return a metadata-ready metrics dictionary."""
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1]
+    report = classification_report(y_test, y_pred, output_dict=True)
+    matrix = confusion_matrix(y_test, y_pred)
 
-    logger.info("Accuracy: %.4f", accuracy_score(y_test, y_pred))
-    logger.info("ROC-AUC: %.4f", roc_auc_score(y_test, y_prob))
-    logger.info("Confusion matrix:\n%s", confusion_matrix(y_test, y_pred))
+    metrics = {
+        "test_size": int(len(y_test)),
+        "accuracy": round(float(accuracy_score(y_test, y_pred)), 3),
+        "roc_auc": round(float(roc_auc_score(y_test, y_prob)), 3),
+        "pr_auc": round(float(average_precision_score(y_test, y_prob)), 3),
+        "precision_churn": round(float(report["1"]["precision"]), 3),
+        "recall_churn": round(float(report["1"]["recall"]), 3),
+        "f1_churn": round(float(report["1"]["f1-score"]), 3),
+        "confusion_matrix": {
+            "true_negative": int(matrix[0, 0]),
+            "false_positive": int(matrix[0, 1]),
+            "false_negative": int(matrix[1, 0]),
+            "true_positive": int(matrix[1, 1]),
+        },
+    }
+
+    logger.info("Accuracy: %.4f", metrics["accuracy"])
+    logger.info("ROC-AUC: %.4f", metrics["roc_auc"])
+    logger.info("PR-AUC: %.4f", metrics["pr_auc"])
+    logger.info("Confusion matrix:\n%s", matrix)
     logger.info("Classification report:\n%s", classification_report(y_test, y_pred))
+    return metrics
+
+
+def save_model_metadata(model: Pipeline, metrics: dict, raw_rows: int, raw_columns: int, test_rows: int) -> None:
+    """Persist governance metadata next to the trained model artifact."""
+    classifier = model.named_steps["classifier"]
+    metadata_payload = {
+        "model_version": "1.0.0",
+        "training_timestamp": datetime.now(UTC).isoformat(),
+        "artifact_path": str(config.MODEL_PATH.relative_to(config.BASE_DIR)),
+        "model_type": "sklearn.pipeline.Pipeline",
+        "estimator": type(classifier).__name__,
+        "metrics": {**metrics, "test_size": test_rows},
+        "feature_schema": {
+            "numeric_features": config.NUMERIC_FEATURES,
+            "categorical_features": config.CATEGORICAL_FEATURES,
+            "target_column": config.TARGET_COLUMN,
+            "target_map": config.TARGET_MAP,
+            "transformed_feature_count": len(model.named_steps["preprocessor"].get_feature_names_out()),
+        },
+        "runtime": {
+            "python_version": ".".join(map(str, sys.version_info[:3])),
+            "scikit_learn_version": metadata.version("scikit-learn"),
+        },
+        "training_configuration": {
+            "random_state": config.RANDOM_STATE,
+            "test_size": config.TEST_SIZE,
+            "grid_search_cv_folds": config.GRID_SEARCH_CV_FOLDS,
+            "grid_search_scoring": config.GRID_SEARCH_SCORING,
+            "best_params": {
+                "classifier__n_estimators": classifier.get_params()["n_estimators"],
+                "classifier__max_depth": classifier.get_params()["max_depth"],
+                "classifier__min_samples_split": classifier.get_params()["min_samples_split"],
+            },
+            "param_grid": config.RF_PARAM_GRID,
+        },
+        "data": {
+            "source": "IBM Telco Customer Churn dataset",
+            "raw_path": str(config.RAW_DATA_PATH.relative_to(config.BASE_DIR)),
+            "raw_rows": raw_rows,
+            "raw_columns": raw_columns,
+            "processed_dashboard_rows": raw_rows,
+        },
+    }
+    with open(config.MODEL_METADATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(metadata_payload, f, indent=2)
+        f.write("\n")
+    logger.info("Saved model metadata to %s", config.MODEL_METADATA_PATH)
 
 
 def main() -> None:
