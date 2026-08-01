@@ -24,6 +24,18 @@ The platform provides a complete retention pipeline:
 Built on the IBM Telco Customer Churn dataset (7,043 customers), this project demonstrates production-grade ML engineering, clear separation of concerns, and executive-level business storytelling.
 
 ---
+---
+## ⭐ Project Highlights
+
+- End-to-end production ML pipeline
+- Explainable AI using SHAP
+- Interactive executive dashboard
+- Automated testing with pytest
+- Model governance and metadata validation
+- Self-healing data pipeline
+- Live deployment on Streamlit Community Cloud
+---
+
 
 ## 🎯 Business Problem & Solution
 
